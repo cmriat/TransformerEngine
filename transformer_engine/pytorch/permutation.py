@@ -59,9 +59,8 @@ class _moe_permute_index_map(torch.autograd.Function):
         topK = index.size(1)
 
         input_max_expanded_token_num = max(max_token_num, inp.size(0)) * topK
-        if _moe_permute_index_map.max_expanded_token_num < input_max_expanded_token_num:
-            _moe_permute_index_map.max_expanded_token_num = input_max_expanded_token_num
-            _moe_permute_index_map.workspace = []
+        _moe_permute_index_map.max_expanded_token_num = input_max_expanded_token_num
+        _moe_permute_index_map.workspace = []
 
         permuted_act, row_id_map, _moe_permute_index_map.workspace = tex.moe_permute_fwd(
             inp,
