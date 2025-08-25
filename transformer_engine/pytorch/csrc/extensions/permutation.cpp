@@ -51,21 +51,6 @@ std::tuple<at::Tensor, at::Tensor, std::vector<at::Tensor>> moe_permute_fwd(
       reinterpret_cast<int *>(sorted_indices_ptr), reinterpret_cast<int *>(row_id_ptr),
       reinterpret_cast<int *>(sorted_row_id_ptr), num_tokens * topK);
 
-  // Count -1s efficiently: since they're sorted, all -1s are at the beginning
-  // Use binary search to find the first non-(-1) element
-  auto sorted_indices_tensor = torch::from_blob(sorted_indices_ptr, {num_tokens * topK}, 
-                                               torch::dtype(torch::kInt32).device(torch::kCUDA));
-  auto mask = sorted_indices_tensor.ne(-1);
-  auto first_valid_idx = torch::argmax(mask.to(torch::kInt32)).item<int>();
-  int num_minus_ones = (sorted_indices_tensor[0].item<int>() == -1) ? first_valid_idx : 0;
-  
-  // Calculate actual number of valid tokens after filtering -1s
-  const int valid_tokens = num_tokens * topK - num_minus_ones;
-  num_out_tokens = valid_tokens;
-  
-  // Adjust pointers to skip -1 entries
-  void *filtered_sorted_indices_ptr = reinterpret_cast<char*>(sorted_indices_ptr) + num_minus_ones * sizeof(int);
-  void *filtered_sorted_row_id_ptr = reinterpret_cast<char*>(sorted_row_id_ptr) + num_minus_ones * sizeof(int);
   at::Tensor permuted_output =
       torch::empty({num_out_tokens, num_cols},
                    torch::dtype(input.scalar_type()).device(torch::kCUDA).requires_grad(false));
@@ -84,7 +69,7 @@ std::tuple<at::Tensor, at::Tensor, std::vector<at::Tensor>> moe_permute_fwd(
                                                       static_cast<size_t>(num_cols)},
                                   dtype);
   auto sorted_row_id_cu = makeTransformerEngineTensor(
-      filtered_sorted_row_id_ptr, std::vector<size_t>{static_cast<size_t>(valid_tokens)},
+      sorted_row_id_ptr, std::vector<size_t>{static_cast<size_t>(num_tokens * topK)},
       DType::kInt32);
   auto row_id_map_cu = makeTransformerEngineTensor(row_id_map);
 
