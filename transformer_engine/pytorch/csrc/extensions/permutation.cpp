@@ -50,7 +50,10 @@ std::tuple<at::Tensor, at::Tensor, std::vector<at::Tensor>> moe_permute_fwd(
       d_temp_storage, &temp_storage_bytes, reinterpret_cast<int *>(indices_ptr),
       reinterpret_cast<int *>(sorted_indices_ptr), reinterpret_cast<int *>(row_id_ptr),
       reinterpret_cast<int *>(sorted_row_id_ptr), num_tokens * topK);
-
+  // Calculate actual number of valid tokens after filtering -1s
+  const int num_minus_ones = num_tokens * topK - num_out_tokens;
+  // Adjust pointers to skip -1 entries
+  sorted_row_id_ptr = reinterpret_cast<char*>(sorted_row_id_ptr) + num_minus_ones * sizeof(int);
   at::Tensor permuted_output =
       torch::empty({num_out_tokens, num_cols},
                    torch::dtype(input.scalar_type()).device(torch::kCUDA).requires_grad(false));
@@ -69,7 +72,7 @@ std::tuple<at::Tensor, at::Tensor, std::vector<at::Tensor>> moe_permute_fwd(
                                                       static_cast<size_t>(num_cols)},
                                   dtype);
   auto sorted_row_id_cu = makeTransformerEngineTensor(
-      sorted_row_id_ptr, std::vector<size_t>{static_cast<size_t>(num_tokens * topK)},
+      sorted_row_id_ptr, std::vector<size_t>{static_cast<size_t>(num_out_tokens)},
       DType::kInt32);
   auto row_id_map_cu = makeTransformerEngineTensor(row_id_map);
 
