@@ -178,7 +178,6 @@ if __name__ == "__main__":
         cmdclass={"build_ext": CMakeBuildExtension, "bdist_wheel": TimedBdist},
         python_requires=">=3.8",
         classifiers=["Programming Language :: Python :: 3"],
-        install_requires=install_requires,
         license_files=("LICENSE",),
         include_package_data=include_package_data,
         package_data=package_data,
