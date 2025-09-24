@@ -10,16 +10,15 @@
 
 #include "../common.h"
 
-static __global__ void moe_permute_row_map(const int *sorted_row_id, int *row_id_map,
-                                           const int num_rows, const int topK,
-                                           const int num_out_tokens) {
+static __global__ void moe_permute_row_map(const int *sorted_row_id, const int *sorted_indices, int *row_id_map,
+                                           const int num_rows, const int topK) {
   // Each block corresponds to one source token
   // row_id_map[topK][num_rows]
   const int bid = blockIdx.x;
   const int tid = threadIdx.x;
   const int idx = bid * blockDim.x + tid;
 
-  if (idx >= num_out_tokens) return;
+  if (sorted_indices[idx] == -1) return;
 
   int source_row = sorted_row_id[idx];
   int source_token_id = source_row / topK;
@@ -218,7 +217,7 @@ __global__ void moe_permute_kernel(const T *input_bwd, const T *input_fwd, T *ac
 }
 
 template <typename T>
-void nvte_permute_launcher(const T *input, T *output, const int *sorted_row_id, int *row_id_map,
+void nvte_permute_launcher(const T *input, T *output, const int *sorted_row_id, const int *sorted_indices, int *row_id_map,
                            const float *prob, float *prob_grad, const T *input_fwd,
                            const int num_rows, const int topK, const int num_cols,
                            const int num_out_tokens, cudaStream_t stream) {
@@ -232,10 +231,9 @@ void nvte_permute_launcher(const T *input, T *output, const int *sorted_row_id, 
     // moe_permute_fwd
 
     int threads = 64;
-    int blocks = (num_out_tokens + threads - 1) / threads;
+    int blocks = (num_rows * topK + threads - 1) / threads;
 
-    moe_permute_row_map<<<blocks, threads, 0, stream>>>(sorted_row_id, row_id_map, num_rows, topK,
-                                                        num_out_tokens);
+    moe_permute_row_map<<<blocks, threads, 0, stream>>>(sorted_row_id, sorted_indices, row_id_map, num_rows, topK);
 
     blocks = num_rows;
     threads = std::min(num_cols / kElementsPerAccess, 1024);
@@ -308,6 +306,7 @@ void nvte_unpermute_launcher(const T *input, T *output, int *row_id_map, const f
 }
 
 void nvte_permute(const NVTETensor input, NVTETensor output, const NVTETensor sorted_row_id,
+                  const NVTETensor sorted_indices,
                   NVTETensor row_id_map, const NVTETensor prob, NVTETensor prob_grad,
                   const NVTETensor input_fwd, const int num_rows, const int topK,
                   const int num_cols, const int num_out_tokens, cudaStream_t stream) {
@@ -317,6 +316,7 @@ void nvte_permute(const NVTETensor input, NVTETensor output, const NVTETensor so
   const Tensor *input_cu = convertNVTETensorCheck(input);
   const Tensor *output_cu = convertNVTETensorCheck(output);
   const Tensor *sorted_row_id_cu = convertNVTETensorCheck(sorted_row_id);
+  const Tensor *sorted_indices_cu = convertNVTETensorCheck(sorted_indices);
   const Tensor *row_id_map_cu = convertNVTETensorCheck(row_id_map);
   const Tensor *prob_cu = convertNVTETensorCheck(prob);
   const Tensor *prob_grad_cu = convertNVTETensorCheck(prob_grad);
@@ -327,6 +327,7 @@ void nvte_permute(const NVTETensor input, NVTETensor output, const NVTETensor so
       nvte_permute_launcher(reinterpret_cast<const T *>(input_cu->data.dptr),
                             reinterpret_cast<T *>(output_cu->data.dptr),
                             reinterpret_cast<const int *>(sorted_row_id_cu->data.dptr),
+                            reinterpret_cast<const int *>(sorted_indices_cu->data.dptr),
                             reinterpret_cast<int *>(row_id_map_cu->data.dptr),
                             reinterpret_cast<const float *>(prob_cu->data.dptr),
                             reinterpret_cast<float *>(prob_grad_cu->data.dptr),

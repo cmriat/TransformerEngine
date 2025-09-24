@@ -22,9 +22,7 @@ std::tuple<at::Tensor, at::Tensor, std::vector<at::Tensor>> moe_permute_fwd(
 
     at::Tensor sorted_indices = torch::empty(max_expanded_token_num, options);
     at::Tensor row_id = torch::range(0, max_expanded_token_num - 1, 1, options);
-    at::Tensor sorted_row_id =
-        torch::empty(max_expanded_token_num,
-                     torch::dtype(torch::kInt32).device(torch::kCUDA).requires_grad(false));
+    at::Tensor sorted_row_id = torch::empty(max_expanded_token_num, options);
 
     size_t temp_storage_bytes = 0;
     nvte_device_radix_sort_pairs(nullptr, &temp_storage_bytes, nullptr, nullptr, nullptr, nullptr,
@@ -50,10 +48,7 @@ std::tuple<at::Tensor, at::Tensor, std::vector<at::Tensor>> moe_permute_fwd(
       d_temp_storage, &temp_storage_bytes, reinterpret_cast<int *>(indices_ptr),
       reinterpret_cast<int *>(sorted_indices_ptr), reinterpret_cast<int *>(row_id_ptr),
       reinterpret_cast<int *>(sorted_row_id_ptr), num_tokens * topK);
-  // Calculate actual number of valid tokens after filtering -1s
-  const int num_minus_ones = num_tokens * topK - num_out_tokens;
-  // Adjust pointers to skip -1 entries
-  sorted_row_id_ptr = reinterpret_cast<char*>(sorted_row_id_ptr) + num_minus_ones * sizeof(int);
+  num_out_tokens = num_out_tokens > 0 ? num_out_tokens : num_tokens * topK;
   at::Tensor permuted_output =
       torch::empty({num_out_tokens, num_cols},
                    torch::dtype(input.scalar_type()).device(torch::kCUDA).requires_grad(false));
@@ -74,9 +69,12 @@ std::tuple<at::Tensor, at::Tensor, std::vector<at::Tensor>> moe_permute_fwd(
   auto sorted_row_id_cu = makeTransformerEngineTensor(
       sorted_row_id_ptr, std::vector<size_t>{static_cast<size_t>(num_out_tokens)},
       DType::kInt32);
+  auto sorted_indices_cu = makeTransformerEngineTensor(
+      sorted_indices_ptr, std::vector<size_t>{static_cast<size_t>(num_tokens * topK)},
+      DType::kInt32);
   auto row_id_map_cu = makeTransformerEngineTensor(row_id_map);
 
-  nvte_permute(input_cu.data(), permuted_output_cu.data(), sorted_row_id_cu.data(),
+  nvte_permute(input_cu.data(), permuted_output_cu.data(), sorted_row_id_cu.data(), sorted_indices_cu.data(),
                row_id_map_cu.data(), TensorWrapper().data(), TensorWrapper().data(),
                TensorWrapper().data(), num_tokens, topK, num_cols, num_out_tokens, stream);
 
@@ -149,7 +147,7 @@ std::tuple<at::Tensor, at::Tensor> moe_unpermute_bwd(at::Tensor input_bwd, at::T
   auto prob_cu = makeTransformerEngineTensor(prob);
   auto prob_grad_cu = makeTransformerEngineTensor(prob_grad);
 
-  nvte_permute(input_bwd_cu.data(), act_grad_cu.data(), TensorWrapper().data(),
+  nvte_permute(input_bwd_cu.data(), act_grad_cu.data(), TensorWrapper().data(), TensorWrapper().data(),
                row_id_map_cu.data(), prob_cu.data(), prob_grad_cu.data(), input_fwd_cu.data(),
                num_tokens, topK, num_cols, 0, stream);
 

@@ -9,7 +9,7 @@
 
 #include "transformer_engine.h"
 
-void nvte_permute(const NVTETensor input, NVTETensor output, const NVTETensor sorted_row_id,
+void nvte_permute(const NVTETensor input, NVTETensor output, const NVTETensor sorted_row_id, const NVTETensor sorted_indices,
                   NVTETensor row_id_map, const NVTETensor prob, NVTETensor prob_grad,
                   const NVTETensor input_fwd, const int num_rows, const int topK,
                   const int num_cols, const int num_out_tokens, cudaStream_t stream = nullptr);
