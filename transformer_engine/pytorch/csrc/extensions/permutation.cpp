@@ -67,7 +67,7 @@ std::tuple<at::Tensor, at::Tensor, std::vector<at::Tensor>> moe_permute_fwd(
                                                       static_cast<size_t>(num_cols)},
                                   dtype);
   auto sorted_row_id_cu = makeTransformerEngineTensor(
-      sorted_row_id_ptr, std::vector<size_t>{static_cast<size_t>(num_out_tokens)},
+      sorted_row_id_ptr, std::vector<size_t>{static_cast<size_t>(num_tokens * topK)},
       DType::kInt32);
   auto sorted_indices_cu = makeTransformerEngineTensor(
       sorted_indices_ptr, std::vector<size_t>{static_cast<size_t>(num_tokens * topK)},

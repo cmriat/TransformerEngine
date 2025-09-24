@@ -17,8 +17,8 @@ static __global__ void moe_permute_row_map(const int *sorted_row_id, const int *
   const int bid = blockIdx.x;
   const int tid = threadIdx.x;
   const int idx = bid * blockDim.x + tid;
-
-  if (sorted_indices[idx] == -1) return;
+                                  
+  if (idx >= num_rows * topK || sorted_indices[idx] == -1) return;
 
   int source_row = sorted_row_id[idx];
   int source_token_id = source_row / topK;
