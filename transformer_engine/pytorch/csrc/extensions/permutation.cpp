@@ -76,7 +76,7 @@ std::tuple<at::Tensor, at::Tensor, std::vector<at::Tensor>> moe_permute_fwd(
 
   nvte_permute(input_cu.data(), permuted_output_cu.data(), sorted_row_id_cu.data(), sorted_indices_cu.data(),
                row_id_map_cu.data(), TensorWrapper().data(), TensorWrapper().data(),
-               TensorWrapper().data(), num_tokens, topK, num_cols, num_out_tokens, stream);
+               TensorWrapper().data(), num_tokens, topK, 0, num_cols, stream);
 
   return std::make_tuple(permuted_output, row_id_map, workspace);
 }
@@ -122,10 +122,10 @@ std::tuple<at::Tensor, at::Tensor> moe_unpermute_bwd(at::Tensor input_bwd, at::T
   const int topK = (prob.numel() > 0) ? prob.size(1) : 1;
   const int num_tokens = (prob.numel() > 0) ? prob.size(0) : row_id_map.size(0);
   int num_cols = input_bwd.size(1);
-
+  int num_input_tokens = input_fwd.size(0);
   // Output buffer alloc
   at::Tensor act_grad =
-      torch::empty({input_fwd.size(0), num_cols},
+      torch::empty({num_tokens * topK, num_cols},
                    torch::dtype(input_bwd.scalar_type()).device(torch::kCUDA).requires_grad(false));
   at::Tensor prob_grad = torch::empty(
       {num_tokens, topK}, torch::dtype(torch::kFloat32).device(torch::kCUDA).requires_grad(false));
@@ -150,7 +150,7 @@ std::tuple<at::Tensor, at::Tensor> moe_unpermute_bwd(at::Tensor input_bwd, at::T
 
   nvte_permute(input_bwd_cu.data(), act_grad_cu.data(), TensorWrapper().data(), TensorWrapper().data(),
                row_id_map_cu.data(), prob_cu.data(), prob_grad_cu.data(), input_fwd_cu.data(),
-               num_tokens, topK, num_cols, 0, stream);
+               num_tokens, topK, num_input_tokens, num_cols, stream);
 
   return std::make_tuple(act_grad, prob_grad);
 }
