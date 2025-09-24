@@ -88,6 +88,7 @@ at::Tensor moe_permute_bwd(at::Tensor input, const DType dtype, at::Tensor row_i
 
 at::Tensor moe_unpermute_fwd(at::Tensor input, const DType dtype, at::Tensor row_id_map,
                              at::Tensor prob, int64_t num_tokens, int64_t topK) {
+  int num_input_tokens = input.size(0);
   int num_cols = input.size(1);
 
   // Output buffer alloc
@@ -110,7 +111,7 @@ at::Tensor moe_unpermute_fwd(at::Tensor input, const DType dtype, at::Tensor row
   auto prob_cu = makeTransformerEngineTensor(prob);
 
   nvte_unpermute(input_cu.data(), unpermuted_output_cu.data(), row_id_map_cu.data(), prob_cu.data(),
-                 num_tokens, topK, num_cols, stream);
+                 num_tokens, topK, num_input_tokens, num_cols, stream);
 
   return unpermuted_output;
 }
