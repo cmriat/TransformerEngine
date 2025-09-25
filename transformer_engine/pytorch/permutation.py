@@ -66,7 +66,6 @@ class _moe_permute_index_map(torch.autograd.Function):
             inp,
             dtype,
             index,
-            num_out_tokens,
             _moe_permute_index_map.workspace,
             _moe_permute_index_map.max_expanded_token_num,
         )

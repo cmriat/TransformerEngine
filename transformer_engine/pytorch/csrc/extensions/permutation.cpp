@@ -9,7 +9,7 @@
 namespace transformer_engine::pytorch {
 
 std::tuple<at::Tensor, at::Tensor, std::vector<at::Tensor>> moe_permute_fwd(
-    at::Tensor input, const DType dtype, at::Tensor indices, int64_t num_out_tokens,
+    at::Tensor input, const DType dtype, at::Tensor indices, 
     std::vector<at::Tensor> workspace, int64_t max_expanded_token_num) {
   const int num_tokens = input.size(0);
   int num_cols = input.size(1);
@@ -48,9 +48,9 @@ std::tuple<at::Tensor, at::Tensor, std::vector<at::Tensor>> moe_permute_fwd(
       d_temp_storage, &temp_storage_bytes, reinterpret_cast<int *>(indices_ptr),
       reinterpret_cast<int *>(sorted_indices_ptr), reinterpret_cast<int *>(row_id_ptr),
       reinterpret_cast<int *>(sorted_row_id_ptr), num_tokens * topK);
-  num_out_tokens = num_out_tokens > 0 ? num_out_tokens : num_tokens * topK;
+
   at::Tensor permuted_output =
-      torch::empty({num_out_tokens, num_cols},
+      torch::empty({num_tokens * topK, num_cols},
                    torch::dtype(input.scalar_type()).device(torch::kCUDA).requires_grad(false));
   at::Tensor row_id_map = torch::full(
       {num_tokens * topK}, -1, torch::dtype(torch::kInt32).device(torch::kCUDA).requires_grad(false));

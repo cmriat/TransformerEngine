@@ -18,7 +18,7 @@ namespace transformer_engine::pytorch {
  **************************************************************************************************/
 
 std::tuple<at::Tensor, at::Tensor, std::vector<at::Tensor>> moe_permute_fwd(
-    at::Tensor input, const DType dtype, at::Tensor indices, int64_t num_out_tokens,
+    at::Tensor input, const DType dtype, at::Tensor indices,
     std::vector<at::Tensor> workspace, int64_t max_expanded_token_num);
 
 at::Tensor moe_permute_bwd(at::Tensor input, const DType dtype, at::Tensor row_id_map,
